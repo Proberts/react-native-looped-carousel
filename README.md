@@ -23,6 +23,7 @@ Name | propType | default value | description
 --- | --- | --- | ---
 infinite | boolean | true | Scroll should be infinite (wrap)
 autoplay | boolean | true | enables auto animations
+touchDisablesAutoplay | boolean | false | Autoplay will stop if user drags or taps bullets/arrows
 delay | number | 4000 | number in milliseconds between auto animations
 currentPage | number | 0 | allows you to set initial page
 pageStyle | style | null | style for pages
