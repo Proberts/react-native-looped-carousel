@@ -21,12 +21,14 @@ npm install react-native-looped-carousel --save
 
 Name | propType | default value | description
 --- | --- | --- | ---
+infinite | boolean | true | Scroll should be infinite (wrap)
 autoplay | boolean | true | enables auto animations
 delay | number | 4000 | number in milliseconds between auto animations
 currentPage | number | 0 | allows you to set initial page
 pageStyle | style | null | style for pages
 contentContainerStyle | style | null | `contentContainerStyle` for the scrollView
 onAnimateNextPage | func | null | callback that is called with 0-based Id of the current page
+scrollWidth | number | style.width | How far to scroll to move one item (allows smaller than style.width items)
 |
 pageInfo | boolean | false | shows `{currentPage} / {totalNumberOfPages}` pill at the bottom
 pageInfoBackgroundColor | string | 'rgba(0, 0, 0, 0.25)' | background color for pageInfo
