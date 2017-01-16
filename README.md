@@ -25,11 +25,13 @@ infinite | boolean | true | Scroll should be infinite (wrap)
 autoplay | boolean | true | enables auto animations
 touchDisablesAutoplay | boolean | false | Autoplay will stop if user drags or taps bullets/arrows
 delay | number | 4000 | number in milliseconds between auto animations
-currentPage | number | 0 | allows you to set initial page
+initialPage | number | 0 | allows you to set initial page
 pageStyle | style | null | style for pages
 contentContainerStyle | style | null | `contentContainerStyle` for the scrollView
 onAnimateNextPage | func | null | callback that is called with 0-based Id of the current page
 scrollWidth | number | style.width | How far to scroll to move one item (allows smaller than style.width items)
+swipeWentOutOfView | function (last_page, next_page) | null | If infinite=false, this function will be called if the user swipes the pages out of the view (i.e. can close the carousel). The argument last_page was the page the user was on when they swiped, and next_page is the page that will be scrolled to next if swipeWentOutOfView returns 'true'. If swipeWentOutOfView returns 'false' the carousel will not update (will appear blank), and presumably closed.
+animatePagesIntoView | boolean | false | (For infinite=false) Animates initialPage into view. Currently ignored by infinite=true
 |
 pageInfo | boolean | false | shows `{currentPage} / {totalNumberOfPages}` pill at the bottom
 pageInfoBackgroundColor | string | 'rgba(0, 0, 0, 0.25)' | background color for pageInfo

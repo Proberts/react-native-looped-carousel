@@ -7,7 +7,7 @@ import {
   View,
   TouchableWithoutFeedback,
 } from 'react-native';
-
+import TimerMixin from 'react-timer-mixin';
 
 const PAGE_CHANGE_DELAY = 4000;
 
@@ -21,7 +21,7 @@ export default class Carousel extends Component {
     autoplay: React.PropTypes.bool,
     delay: React.PropTypes.number,
     infinite: React.PropTypes.bool,
-    currentPage: React.PropTypes.number,
+    initialPage: React.PropTypes.number,
     style: View.propTypes.style,
     pageStyle: View.propTypes.style,
     contentContainerStyle: View.propTypes.style,
@@ -41,6 +41,8 @@ export default class Carousel extends Component {
     onAnimateNextPage: React.PropTypes.func,
     scrollWidth: React.PropTypes.number,
     touchDisablesAutoplay: React.PropTypes.bool,
+    swipeWentOutOfView: React.PropTypes.func,
+    animatePagesIntoView: React.PropTypes.bool,
   };
 
   static defaultProps = {
@@ -52,7 +54,7 @@ export default class Carousel extends Component {
     arrows: false,
     pageInfoBackgroundColor: 'rgba(0, 0, 0, 0.25)',
     pageInfoTextSeparator: ' / ',
-    currentPage: 0,
+    initialPage: 0,
     style: undefined,
     pageStyle: undefined,
     contentContainerStyle: undefined,
@@ -67,35 +69,33 @@ export default class Carousel extends Component {
     onAnimateNextPage: undefined,
     scrollWidth: 0,
     touchDisablesAutoplay: false,
+    swipeWentOutOfView: null,
+    animatePagesIntoView: false,
   };
 
   constructor(props) {
     super(props);
+    this.edgeOffset = 0;
+    this.maxItemsVisible = 0;
+    this.pageSetBeforeScroll = false;
+    this.autoplayAdvance = true;
     const size = { width: 0, height: 0 };
     if (props.children) {
       const childrenLength = props.children.length ? props.children.length : 1;
       this.state = {
-        currentPage: props.currentPage,
+        currentPage: null,
         size,
         childrenLength,
       };
     } else {
       this.state = { size };
     }
-    this.edgeOffset = 0;
-    this.maxItemsVisible = 1;
-    this.pageSetBeforeScroll = false;
-    this.autoplayAdvance = true;
   }
 
   componentDidMount() {
     if (this.state.childrenLength) {
       this._setUpTimer();
     }
-  }
-
-  conponentWillMount() {
-    this._animateToPage(this.props.currentPage, false);
   }
 
   componentWillUnmount() {
@@ -116,11 +116,9 @@ export default class Carousel extends Component {
     if (this.props.scrollWidth === 0) return;
     const itemSlop = this.state.size.width - this.props.scrollWidth;
     if (itemSlop > 0) this.edgeOffset = parseInt(itemSlop*-0.5, 10);
-console.log("setEdgeOffset",this.state.size.width,this.props.scrollWidth,this.edgeOffset);
   }
 
   _onScrollBegin = () => {
-    console.log('DragBegin');
     this._clearTimer();
     if (this.props.touchDisablesAutoplay) this.autoplayAdvance = false;
     if (this.pageSetBeforeScroll) this._animateToPage();
@@ -139,42 +137,72 @@ console.log('_setCurrentPage', currentPage);
   _onScrollEnd = (event) => {
     const offset = { ...event.nativeEvent.contentOffset };
     const page = this._calculateCurrentPage(offset.x);
-console.log("currentPage=",page);
-      //this._placeCritical(page);
       this._animateToPage(page);
-//      this._animateToPage(page);
-//    this._placeCritical(page);
-//    this._setCurrentPage(page);
-//    this._setUpTimer();
   }
 
   _calculateCurrentPage = (offset) => {
     var { width } = this.state.size;
     if (this.props.scrollWidth > 0) width = this.props.scrollWidth;
     var page = Math.floor( (offset + (width*0.5)) / width);
-console.log("calc",page,offset,width);
     page-=(this.maxItemsVisible-1);
 
+    let calcPage = page;
     if(this.props.infinite===false) {
       if (page<0) page=0;
       else
       if (page>=this.state.childrenLength) page=this.state.childrenLength-1;
+      if(page!==calcPage) {
+        if(this.props.swipeWentOutOfView) {
+          var cont = this.props.swipeWentOutOfView(this.state.currentPage,page);
+          if(cont===false) page=calcPage;
+        }
+      }
     }
 
     return page;
   }
 
   _onLayout = () => {
-    this.container.measure((x, y, w, h) => {
-      this.setState({
-        size: { width: w, height: h },
+
+      this.container.measure((x, y, w, h) => {
+        if(this.state.size.width !== w || this.state.size.height!== h) {
+          this.setState({
+            size: { width: w, height: h },
+          });
+        }
       });
-      if (this.props.scrollWidth > 0) {
-        this._setEdgeOffset();
-        this.maxItemsVisible = Math.ceil(w/this.props.scrollWidth) + 1
-      }
-      this._placeCritical(this.state.currentPage);
-    });
+
+      if(this.maxItemsVisible === 0 && this.state.size.width !== 0 ) {
+console.log("!!!!",this.maxItemsVisible,this.state.size);
+
+        if (this.props.scrollWidth > 0) {
+          this._setEdgeOffset();
+          this.maxItemsVisible = Math.ceil(this.state.size.width/this.props.scrollWidth) + 1
+        } else {
+          this.maxItemsVisible = 1;
+        }
+
+        var page = this.state.currentPage;
+        if(this.state.currentPage === undefined || this.state.currentPage === null) {
+          //this.setState({currentPage: this.props.initialPage});
+          page=this.props.initialPage;
+        }
+
+        if(this.props.infinite === false && this.props.animatePagesIntoView) {
+console.log("animated",page,this.props.animatePagesIntoView);
+          //this.pageSetBeforeScroll=false;
+          this._scrollTo(-this.edgeOffset,false);
+          this._setCurrentPage(page);
+          //this._setCurrentPage(0-(this.maxItemsVisible-2));
+          //this.pageSetBeforeScroll=true;
+          //  this._animateToPage(page, true);
+          setTimeout(() => {this._animateToPage(page,true)}, 100);
+        } else {
+          this._setCurrentPage(page);
+          this.pageSetBeforeScroll=true;
+          this._animateToPage(page, false);
+        }
+    }
   }
 
   _clearTimer = () => {
@@ -193,10 +221,10 @@ console.log("calc",page,offset,width);
     if (this.scrollView) {
       this.scrollView.scrollTo({ y: 0, x: offset + this.edgeOffset, animated });
     }
-    console.log("ScrollTo",offset,offset+this.edgeOffset,this.edgeOffset);
+    console.log("ScrollTo",this.scrollView,offset,offset+this.edgeOffset,this.edgeOffset);
   }
 
-  _animateToPage = (page, showAnim) => {
+  _animateToPage = (page, showAnim=true) => {
 console.log("animateToPage",page,showAnim);
     const { childrenLength } = this.state;
     this._clearTimer();
@@ -211,9 +239,7 @@ console.log("animateToPage",page,showAnim);
 
     var { width } = this.state.size;
     if (this.props.scrollWidth > 0) width = this.props.scrollWidth;
-
     if (this.pageSetBeforeScroll) {
-      console.log("prescroll =",this.state.currentPage,this.state.currentPage+this.maxItemsVisible-1,width);
       this.pageSetBeforeScroll = false;
       this._scrollTo( (this.state.currentPage+this.maxItemsVisible-1) * width, false);
     }
@@ -222,12 +248,10 @@ console.log("animateToPage",page,showAnim);
     var visiblePage = page+(this.maxItemsVisible-1);
     this._scrollTo(visiblePage * width,true);
     this._placeCritical(page);
-    //this._setCurrentPage(currentPage);
     this._setUpTimer();
   }
 
   _placeCritical = (page) => {
-console.log("placeCritical",page);
     const { childrenLength, currentPage } = this.state;
     var { width } = this.state.size;
     if (this.props.scrollWidth > 0) width = this.props.scrollWidth;
@@ -278,18 +302,20 @@ console.log("placeCritical",page);
   _renderBullets = (pageLength) => {
     const bullets = [];
     const selectedPage = this.state.currentPage;
-//console.log("Bullets currentPage,selectedPage",this.state.currentPage,selectedPage);
+
     for (let i = 0; i < pageLength; i += 1) {
       bullets.push(
-        <TouchableWithoutFeedback onPress={() => {
+        <TouchableWithoutFeedback style={styles.bullets_touchWithSlop} onPress={() => {
             if (this.props.touchDisablesAutoplay) this.autoplayAdvance = false;
             this._animateToPage(i,true)
           }} key={`bullet${i}`}>
-          <View
-            style={i === selectedPage ?
-              [styles.chosenBullet, this.props.chosenBulletStyle] :
-              [styles.bullet, this.props.bulletStyle]}
-          />
+          <View style={styles.bullets_touchWithSlop}>
+            <View
+              style={i === selectedPage ?
+                [styles.chosenBullet, this.props.chosenBulletStyle] :
+                [styles.bullet, this.props.bulletStyle]}
+            />
+          </View>
         </TouchableWithoutFeedback>);
     }
     return (
@@ -336,15 +362,12 @@ console.log("placeCritical",page);
     if (this.props.scrollWidth > 0) width = this.props.scrollWidth;
 
     var maxItemsVisible = this.maxItemsVisible;
-    console.log("maxItemsVisible",maxItemsVisible);
-
 
     if (children && children.length > 1) {
       // add pre-pages
       let i = (children.length - maxItemsVisible) + 1;
       while(i < 0)i+=children.length;
       for (j = 1; j < maxItemsVisible; j++) {
-//console.log("Adding:",i);
         if (this.props.infinite) pages.push(children[i]);
         else pages.push(
           <View style={[{width: width}, styles.invisible]}></View>
@@ -352,16 +375,13 @@ console.log("placeCritical",page);
         i++;
         if (i === children.length) i=0;
       }
-
       // add all pages
       for (i = 0; i < children.length; i += 1) {
-//console.log("Adding:",i);
         pages.push(children[i]);
       }
       // add post-pages
       i = 0;
       for (let j = 1; j < maxItemsVisible; j++ ) {
-//console.log("Adding:",i);
         if (this.props.infinite) pages.push(children[i]);
         else pages.push(
           <View style={[{width: width}, styles.invisible]}></View>
@@ -375,7 +395,7 @@ console.log("placeCritical",page);
       }
     } else {
       return (
-        <Text style={{ backgroundColor: 'white' }}>
+        <Text style={{ backgroundColor: 'red' }}>
           You are supposed to add children inside Carousel
         </Text>
       );
@@ -464,6 +484,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
+  },
+  bullets_touchWithSlop: {
+    flex: 0,
+    width: 30,
+    height: 30,
+    backgroundColor: 'transparent',
   },
   arrows: {
     position: 'absolute',
